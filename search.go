@@ -226,7 +226,7 @@ func main() {
 			if i > 10 {
 				break
 			}
-			fmt.Printf("%d,%d", v.error, v.idx)
+			fmt.Printf("%d", v.error, v.idx)
 			//fmt.Printf("Found Result: %d: %s\n", v.error, v.result)
 		}
 		//fmt.Println("Done")
