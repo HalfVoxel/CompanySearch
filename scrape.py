@@ -15,7 +15,7 @@ i = start
 index = 0
 any = True
 reg = re.compile('<div class="column1NoCheckbox">\s*<h5>\s*(.*?)\s*</h5>\s*<h5>\s*(.*?)\s*</h5>\s*</div>\s*<div class="column2">\s*<h5>\s*(.*?)\s*</h5>\s*<h5>\s*(.*?)\s*</h5>\s*</div>\s*<div class="columnLinks">\s*<h4>\s*<a href="([^"]*?)">Visa mer</a>\s*</h4>"' )
-output = codecs.open("/Users/arong/web/python/scraping/output/"+letter+"_"+str(start)+".csv","w", "utf-8")
+output = codecs.open("/Users/arong/web/python/scraping/output/"+letter+"_"+str(start)+".csv","w","utf-8")
 
 while any and i < end:
 	any = False
@@ -69,7 +69,7 @@ while any and i < end:
 			mapUrl = conts[1].a["href"]
 
 
-		output.write ( str(index) + ", " + "\"" + name + "\", \"" + id + "\", \"" + tel + "\", \"" + city + "\", \"" + url + "\", \"" + moreUrl + "\", \"" + email + "\", \"" + mapUrl + "\"" + "\n")
+		output.write ( str(index) + "," + "\"" + name + "\", \"" + id + "\", \"" + tel + "\", \"" + city + "\", \"" + url + "\", \"" + moreUrl + "\", \"" + email + "\", \"" + mapUrl + "\"" + "\n")
 		index += 1
 		#print (city)
 		#print (url)
