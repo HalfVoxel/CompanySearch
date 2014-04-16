@@ -110,7 +110,10 @@ func main() {
 		for scanner.Scan() {
 			idx, _ := strconv.Atoi(scanner.Text())
 			//fmt.Println(lookup[idx])
-			Find(lookup[idx], idx)
+			path := lookup[idx]
+			if len(path) > 0 {
+				Find(lookup[idx], idx)
+			}
 		}
 	}
 }
