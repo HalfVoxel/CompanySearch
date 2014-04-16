@@ -197,7 +197,7 @@ func main() {
 		}
 	}
 
-	fmt.Println("")
+	//fmt.Println("")
 
 	bio := bufio.NewReader(os.Stdin)
 	cnt := 0
@@ -221,12 +221,12 @@ func main() {
 		node.Search(sneedle, 0, "", 0, cnt, &res, &best)
 
 		sort.Sort(ByError(res))
-
+		fmt.Println(len(res))
 		for i, v := range res {
 			if i > 10 {
 				break
 			}
-			fmt.Printf("%d,%d", v.error, v.idx)
+			fmt.Printf("%d\n", v.idx)
 			//fmt.Printf("Found Result: %d: %s\n", v.error, v.result)
 		}
 		//fmt.Println("Done")
