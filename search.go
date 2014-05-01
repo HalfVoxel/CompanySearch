@@ -12,14 +12,15 @@ import "flag"
 import "unicode"
 import "runtime/pprof"
 import _ "net/http/pprof"
-import "net/http"
+import _ "net/http"
 import "strings"
 
 type Node struct {
-	lookup    map[rune]*Node
+	ch			rune
+	lookup    []*Node
 	links     []Info
 	lastQuery int
-	mins      map[int]int
+	mins      [16]uint8
 }
 
 type Info struct {
@@ -37,7 +38,7 @@ func (node *Node) Insert(s string, index int, idx int ) {
 		node.links = append(node.links, info)
 
 		if counter%10000 == 0 {
-			//fmt.Print("*")
+			fmt.Print("*")
 		}
 
 		counter++
@@ -46,12 +47,23 @@ func (node *Node) Insert(s string, index int, idx int ) {
 
 	v, len := utf8.DecodeRuneInString(s[index:])
 	v = unicode.ToLower(v)
-	next, ok := node.lookup[v]
-	if !ok {
+
+	var next *Node = nil
+	for _, other := range node.lookup {
+		if other.ch == v {
+			next = other
+			break
+		}
+	}
+
+	//next, ok := node.lookup[v]
+	if next == nil {
 		next = new(Node)
+		next.ch = v
 		//next.val = v
-		next.lookup = map[rune]*Node{}
-		node.lookup[v] = next
+		next.lookup = make([]*Node,0)
+		node.lookup = append(node.lookup,next)
+		//fmt.Printf("Inserting %c from %s\n", next.ch, s)
 	}
 
 	//fmt.Print(string(v))
@@ -70,19 +82,19 @@ func (a ByError) Len() int           { return len(a) }
 func (a ByError) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByError) Less(i, j int) bool { return a[i].error < a[j].error }
 
-func (node *Node) Search(s string, index int, trace string, skipped int, queryIndex int, result *[]Result, best *int) int {
+func (node *Node) Search(s string, index int, trace string, skipped int, queryIndex int, result *[]Result, best *int, addedWhitespace bool ) int {
 
 	if node.lastQuery != queryIndex {
 		node.lastQuery = queryIndex
-		node.mins = map[int]int{index: skipped}
+		//node.mins = map[int]int{index: skipped}
 	} else {
-		prevErr, ok2 := node.mins[index]
+		prevErr := node.mins[index]
 		//fmt.Printf("Been here before? %v %d < %d", ok2, prevErr, skipped)
-		if ok2 && prevErr <= skipped {
+		if int(prevErr) <= skipped+1 && prevErr != 0 {
 			return -1
 		}
 
-		node.mins[index] = skipped
+		node.mins[index] = uint8(skipped+1)
 	}
 
 	if skipped > *best+6 {
@@ -101,35 +113,64 @@ func (node *Node) Search(s string, index int, trace string, skipped int, queryIn
 				*best = skipped
 			}
 			//}
-			//fmt.Printf("Found %s with error %d #%d\n", trace, skipped,i)
+			//fmt.Printf("Found %s with error %d\n", trace, skipped)
 		}
 
 		
 		//return 0
 	} else {
 
+		
 		v, length = utf8.DecodeRuneInString(s[index:])
 
-		//fmt.Print(string(v))
+		//fmt.Println(string(v))
 
-		next, ok := node.lookup[v]
-		if ok {
+		//next, ok := node.lookup[v]
+		/*if ok {
 			next.Search(s, index+length, trace+string(v), skipped+0, queryIndex, result, best)
-		}
+		}*/
 	}
 
-	if skipped < 16 {
-		// Skip
-		node.Search(s, index+length, trace, skipped+2, queryIndex, result, best)
+	//fmt.Printf("Searching %s with error %d now at %c current node %c\n", trace, skipped, v, node.ch)
 
-		for k, other := range node.lookup {
-			if k != v {
-				// Insert
-				other.Search(s, index, trace+string(k), skipped+1, queryIndex, result, best)
-				// Replace
-				other.Search(s, index+length, trace+string(k), skipped+3, queryIndex, result, best)
+	if skipped < 16 {
+
+		for _, next := range node.lookup {
+			k := next.ch
+
+			if k == v {
+				next.Search(s, index+length, trace/*+string(k)*/, skipped+0, queryIndex, result, best, addedWhitespace)
 			}
 		}
+
+		for _, next := range node.lookup {
+			k := next.ch
+
+			if k != v {
+				if index == 0 {
+					// Insert
+					next.Search(s, index, trace+string(k), skipped+2, queryIndex, result, best, addedWhitespace)
+				} else if index == len(s) {
+					if k == ' ' {
+						next.Search(s, index, trace+string(k), skipped+0, queryIndex, result, best, true)
+					} else {
+						if addedWhitespace {
+							next.Search(s, index, trace+string(k), skipped+ 1, queryIndex, result, best, addedWhitespace)
+						} else {
+							next.Search(s, index, trace+string(k), skipped+ 2, queryIndex, result, best, addedWhitespace)
+						}
+					}
+				} else {
+					// Insert
+					next.Search(s, index, trace+string(k), skipped+3, queryIndex, result, best, addedWhitespace)
+				}
+				// Replace
+				next.Search(s, index+length, trace+string(k), skipped+4, queryIndex, result, best, addedWhitespace)
+			}
+		}
+
+		// Skip
+		node.Search(s, index+length, trace, skipped+2, queryIndex, result, best, addedWhitespace)
 	}
 
 	return -1
@@ -183,12 +224,13 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	go func() {
+	/*go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	}()*/
 
 	node := new(Node)
-	node.lookup = map[rune]*Node{}
+	//node.lookup = map[rune]*Node{}
+	node.lookup = make([]*Node,0)
 
 	for _, c := range aleph {
 		for i := 0; i < 5000; i += 100 {
@@ -218,7 +260,7 @@ func main() {
 		//fmt.Printf("Searching for %s\n",needle)
 		var res []Result
 		best := 1000
-		node.Search(sneedle, 0, "", 0, cnt, &res, &best)
+		node.Search(sneedle, 0, "", 0, cnt, &res, &best, false)
 
 		sort.Sort(ByError(res))
 		fmt.Println(len(res))
@@ -227,7 +269,7 @@ func main() {
 				break
 			}
 			fmt.Printf("%d\n", v.idx)
-			//fmt.Printf("Found Result: %d: %s\n", v.error, v.result)
+			fmt.Printf("Found Result: %d: %s\n", v.error, v.result)
 		}
 		//fmt.Println("Done")
 	}
