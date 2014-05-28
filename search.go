@@ -4,6 +4,7 @@ import "fmt"
 import "os"
 import "encoding/csv"
 import "log"
+import "encoding/json"
 import "bufio"
 import "unicode/utf8"
 import "strconv"
@@ -14,13 +15,15 @@ import "runtime/pprof"
 import _ "net/http/pprof"
 import _ "net/http"
 import "strings"
+import "./locate"
+import "time"
 
 type Node struct {
 	ch			rune
 	lookup    []*Node
 	links     []Info
 	lastQuery int
-	mins      [16]uint8
+	mins      []uint8
 }
 
 type Info struct {
@@ -38,7 +41,7 @@ func (node *Node) Insert(s string, index int, idx int ) {
 		node.links = append(node.links, info)
 
 		if counter%10000 == 0 {
-			fmt.Print("*")
+			//fmt.Print("*")
 		}
 
 		counter++
@@ -61,7 +64,7 @@ func (node *Node) Insert(s string, index int, idx int ) {
 		next = new(Node)
 		next.ch = v
 		//next.val = v
-		next.lookup = make([]*Node,0)
+		next.lookup = make([]*Node,0,1)
 		node.lookup = append(node.lookup,next)
 		//fmt.Printf("Inserting %c from %s\n", next.ch, s)
 	}
@@ -87,7 +90,14 @@ func (node *Node) Search(s string, index int, trace string, skipped int, queryIn
 	if node.lastQuery != queryIndex {
 		node.lastQuery = queryIndex
 		//node.mins = map[int]int{index: skipped}
+		for i := 0; i < len(node.mins); i++ {
+			node.mins[i] = 128
+		}
 	} else {
+		for index >= len(node.mins) {
+			//return -1
+			node.mins = append(node.mins,128,128) // Grow by 2
+		}
 		prevErr := node.mins[index]
 		//fmt.Printf("Been here before? %v %d < %d", ok2, prevErr, skipped)
 		if int(prevErr) <= skipped+1 && prevErr != 0 {
@@ -189,6 +199,7 @@ func parse(root *Node, path string) {
 	lines, err := r.ReadAll()
 
 	file.Close()
+
 	if err != nil {
 		log.Fatalf("error in file %v, %v", path, err)
 	}
@@ -206,6 +217,21 @@ func parse(root *Node, path string) {
 		/*for i, _ := range line[1] {
 			fmt.Printf (line[1][i])//"%v",runeValue)
 		}*/
+	}
+}
+
+type SearchResult struct {
+	Results []locate.LocatorResult
+}
+
+func read ( reader *bufio.Reader, ch chan []byte ) {
+	for true {
+		s, _, err := reader.ReadLine()
+		if err != nil {
+			panic(err)
+		}
+
+		ch <- s
 	}
 }
 
@@ -239,19 +265,43 @@ func main() {
 		}
 	}
 
+	locator := locate.NewLocator ()
+
 	//fmt.Println("")
 
 	bio := bufio.NewReader(os.Stdin)
 	cnt := 0
+
+	ch := make(chan []byte)
+	go read (bio, ch)
+
 	for {
 		cnt++
 
-		needle, _, err := bio.ReadLine()
+		sleep := float32(0.0)
+
+		var needle []byte
+
+		OuterLoop:
+		for {
+			select {
+			case needle = <-ch:
+				break OuterLoop
+			default:
+				sleep += 0.5
+				if sleep > 120 {
+					return
+				}
+				time.Sleep(time.Second/2)
+			}
+		}
+
+		//needle, _, err := bio.ReadLine()
 		sneedle := strings.ToLower(string(needle))
-		if err != nil {
+		/*if err != nil {
 			return
 			//panic(err)
-		}
+		}*/
 
 		if sneedle == "x" {
 			return
@@ -263,14 +313,30 @@ func main() {
 		node.Search(sneedle, 0, "", 0, cnt, &res, &best, false)
 
 		sort.Sort(ByError(res))
-		fmt.Println(len(res))
+		//fmt.Println(len(res))
+
+		var results SearchResult;
+		//results.results = make(locate.LocatorResult[])
+
 		for i, v := range res {
 			if i > 10 {
 				break
 			}
-			fmt.Printf("%d\n", v.idx)
-			fmt.Printf("Found Result: %d: %s\n", v.error, v.result)
+			//fmt.Printf("%d\n", v.idx)
+			//fmt.Printf("Found Result: %d: %s\n", v.error, v.result)
+
+			res := locator.Find (v.idx)
+			res.Error = v.error
+
+			results.Results = append ( results.Results, res )
 		}
+
+		bytes, err := json.Marshal (results)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("%s\n", string(bytes))
 		//fmt.Println("Done")
 	}
 }
