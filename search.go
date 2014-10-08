@@ -116,8 +116,22 @@ func (node *Node) Search(s string, index int, trace string, skipped int, queryIn
 
 	if index >= len(s) {
 		for _, v := range node.links {
-			//if len(node.links) > 0 {
-			*result = append(*result, Result{trace, skipped, v.idx})
+			addedPreviously := false;
+
+			for i := range *result {
+				previous := &(*result)[i];
+				if previous.idx == v.idx {
+					if skipped < previous.error {
+						previous.error = skipped;
+					}
+					addedPreviously = true;
+				}
+			}
+
+			if (!addedPreviously) {
+				//if len(node.links) > 0 {
+				*result = append(*result, Result{trace, skipped, v.idx})
+			}
 
 			if skipped < *best {
 				*best = skipped
@@ -288,11 +302,11 @@ func main() {
 			case needle = <-ch:
 				break OuterLoop
 			default:
-				sleep += 0.5
+				sleep += 0.05
 				if sleep > 120 {
 					return
 				}
-				time.Sleep(time.Second/2)
+				time.Sleep(time.Second/20)
 			}
 		}
 
@@ -319,7 +333,7 @@ func main() {
 		//results.results = make(locate.LocatorResult[])
 
 		for i, v := range res {
-			if i > 10 {
+			if i > 50 {
 				break
 			}
 			//fmt.Printf("%d\n", v.idx)
